@@ -138,16 +138,28 @@ object TimeUsage {
     otherColumns: List[Column],
     df: DataFrame
   ): DataFrame = {
-    val workingStatusProjection: Column = df.withColumn("telfs", when($"telfs" >= 1 && $"telfs" < 3, "working").otherwise("not working")
-    val sexProjection: Column = $"tesex".when($"tesex" === 1, "male").otherwise("female")
-    val ageProjection: Column = $"teage"
-      .when($"teage" >= 15 && $"teage" <= 22, "young")
+
+    import org.apache.spark.sql.functions._
+
+    val telfs = $"telfs"
+    val tesex = $"tesex"
+
+    val workingStatusProjection: Column = when(telfs >= 1 && telfs < 3, "working")
+      .otherwise("not working")
+      .as("working")
+
+    val sexProjection: Column = when(tesex === 1, "male")
+      .otherwise("female")
+      .as("sex")
+
+    val ageProjection: Column = when($"teage" >= 15 && $"teage" <= 22, "young")
       .when($"teage" >= 23 && $"teage" <= 55, "active")
       .otherwise("elder")
+      .as("age")
 
-    val primaryNeedsProjection: Column = primaryNeedsColumns.reduce(_ + _).divide(60)
-    val workProjection: Column = workColumns.reduce(_ + _).divide(60)
-    val otherProjection: Column = otherColumns.reduce(_ + _).divide(60)
+    val primaryNeedsProjection: Column = primaryNeedsColumns.reduce(_ + _).divide(60).as("primaryNeeds")
+    val workProjection: Column = workColumns.reduce(_ + _).divide(60).as("work")
+    val otherProjection: Column = otherColumns.reduce(_ + _).divide(60).as("other")
 
     df
       .select(workingStatusProjection, sexProjection, ageProjection, primaryNeedsProjection, workProjection, otherProjection)
