@@ -1,0 +1,7 @@
+# Created by .ignore support plugin (hsz.mobi)
+/target/
+/project/project/
+/project/target/
+/.idea/
+/src/main/resource/timeusage/atussum.csv
+/src/main/resources/timeusage/atussum.csv
