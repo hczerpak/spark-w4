@@ -5,3 +5,4 @@
 /.idea/
 /src/main/resource/timeusage/atussum.csv
 /src/main/resources/timeusage/atussum.csv
+/src/test/resources/timeusage/atussum.csv

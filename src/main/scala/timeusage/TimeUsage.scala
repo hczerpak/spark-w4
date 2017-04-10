@@ -3,12 +3,14 @@ package timeusage
 import java.nio.file.Paths
 
 import org.apache.spark.sql._
+import org.apache.spark.sql.expressions.scalalang.typed
 import org.apache.spark.sql.types._
 
 /** Main class */
 object TimeUsage {
 
   import org.apache.spark.sql.SparkSession
+  import org.apache.spark.sql.functions._
 
   val spark: SparkSession =
     SparkSession
@@ -72,7 +74,7 @@ object TimeUsage {
   /** @return An RDD Row compatible with the schema produced by `dfSchema`
     * @param line Raw fields
     */
-  def row(line: List[String]): Row = Row.fromSeq(line)
+  def row(line: List[String]): Row = Row.fromSeq(line.head :: line.tail.map(str => str.toDouble))
 
   /** @return The initial data frame columns partitioned in three groups: primary needs (sleeping, eating, etc.),
     *         work and other (leisure activities)
@@ -139,7 +141,6 @@ object TimeUsage {
     df: DataFrame
   ): DataFrame = {
 
-    import org.apache.spark.sql.functions._
 
     val telfs = $"telfs"
     val tesex = $"tesex"
@@ -186,6 +187,10 @@ object TimeUsage {
   def timeUsageGrouped(summed: DataFrame): DataFrame = {
     summed
       .groupBy($"working", $"sex", $"age")
+//      .agg(
+//        round(avg($"primaryNeeds"), 1).as("primaryNeeds"),
+//        round(avg($"work"), 1).as("work"),
+//        round(avg($"other"), 1).as("other"))
       .avg("primaryNeeds", "work", "other")
       .orderBy("working", "sex", "age")
   }
@@ -204,17 +209,23 @@ object TimeUsage {
     * @param viewName Name of the SQL view to use
     */
   def timeUsageGroupedSqlQuery(viewName: String): String =
-    ???
+    "SELECT working, sex, age, avg(primaryNeeds), avg(work), avg(other) FROM " + viewName + " GROUP BY working, sex, age ORDER BY working, sex, age"
 
   /**
     * @return A `Dataset[TimeUsageRow]` from the “untyped” `DataFrame`
-    * @param timeUsageSummaryDf `DataFrame` returned by the `timeUsageSummary` method
+    * @param df `DataFrame` returned by the `timeUsageSummary` method
     *
     * Hint: you should use the `getAs` method of `Row` to look up columns and
     * cast them at the same time.
     */
-  def timeUsageSummaryTyped(timeUsageSummaryDf: DataFrame): Dataset[TimeUsageRow] =
-    ???
+  def timeUsageSummaryTyped(df: DataFrame): Dataset[TimeUsageRow] = df.map(row => TimeUsageRow(
+    row.getString(0),
+    row.getString(1),
+    row.getString(2),
+    row.getDouble(3),
+    row.getDouble(4),
+    row.getDouble(5)
+  ))
 
   /**
     * @return Same as `timeUsageGrouped`, but using the typed API when possible
@@ -228,7 +239,16 @@ object TimeUsage {
     * Hint: you should use the `groupByKey` and `typed.avg` methods.
     */
   def timeUsageGroupedTyped(summed: Dataset[TimeUsageRow]): Dataset[TimeUsageRow] = {
-    ???
+    summed
+      .groupByKey( row => (row.working, row.sex, row.age))
+      .agg(typed.avg(row => row.primaryNeeds), typed.avg(row => row.work), typed.avg(row => row.other))
+//      .mapGroups {
+//        case (k, iter) =>
+//          val reduced = iter.reduce((r1, r2) => (r1.primaryNeeds + r2.primaryNeeds, r1.work + r2.work, r1.other + r2.other))
+//          TimeUsageRow(k._1, k._2, k._3, reduced._1 / iter.length, reduced._2 / iter.length, reduced._3 / iter.length)
+//      }
+      .sort($"working", $"sex", $"age")
+    .map{ case ((s1, s2, s3), d1, d2, d3) => TimeUsageRow(s1, s2, s3, d1, d2, d3) }
   }
 }
 
